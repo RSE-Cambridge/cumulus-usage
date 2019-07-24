@@ -12,7 +12,7 @@ from prometheus_client import start_http_server
 def get_usage_for_project(cloud, project):
     q2 = "start=2019-04-01T00:00:00&end=2019-07-01T00:00:00"
     url = "/os-simple-tenant-usage/%s?%s"
-    response = cloud.compute.get(url % project.id, q2)
+    response = cloud.compute.get(url % (project.id, q2))
     raw_usage = response.json()['tenant_usage']
 
     usage = {'project_id': project.id, 'project_name': project.name}
@@ -25,7 +25,7 @@ def get_usage_for_project(cloud, project):
 
 def get_usage(cloud):
     for project in cloud.identity.projects():
-        yield get_usage(cloud, project)
+        yield get_usage_for_project(cloud, project)
 
 
 class CustomCollector(object):
@@ -56,6 +56,16 @@ class CustomCollector(object):
 if __name__ == '__main__':
     cloud = openstack.connect()
     cloud.compute.servers()
+
+    print "project_id, project_name, server_usage_count, total_memory_mb_usage, total_vcpus_usage"
+    usages = get_usage(cloud)
+    for usage in usages:
+        usage_list = [usage['project_id'], usage['project_name'],
+                      str(usage['server_usage_count']),
+                      str(usage['total_memory_mb_usage']),
+                      str(usage['total_vcpus_usage'])]
+        print ",".join(usage_list)
+
     print list(get_usage(cloud))
 
     #REGISTRY.register(CustomCollector(cloud))
