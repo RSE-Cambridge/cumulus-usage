@@ -98,7 +98,9 @@ if __name__ == '__main__':
     weekly_usages = get_usages(cloud, list(get_weeks()))
     all_usages = list(monthly_usages) + list(weekly_usages)
 
-    print "project_id, project_name, timeframe, server_usage_count, total_memory_mb_usage, total_vcpus_usage, physical core hours, average physical cores, average physical servers"
+    print ("project_name, timeframe, "
+           "average standard cores, standard core hours, average physical hypervisors, average physical cores, "
+           "active vm count, vm memory usage hours, vm core usage hours, project_id")
 
     for month, usage in all_usages:
         days = 7
@@ -109,18 +111,23 @@ if __name__ == '__main__':
 
         hypervisor_hours = float(usage['total_vcpus_usage']) / 56.0  # 56 vCPU per hypervisor
         physical_core_hours = hypervisor_hours * 32  # 32 physical_cores in a hypervisor
+        adjusted_core_hours = physical_core_hours * 1.171875
         hours = 24 * days
         average_cores = physical_core_hours / hours
+        adjusted_average_cores = average_cores * 1.171875
         average_hypervisors = hypervisor_hours / hours
 
-	usage_list = [usage['project_id'], usage['project_name'],
-	     month,
+	usage_list = [
+             usage['project_name'],
+	     month.strip("wb:"),
+             str(adjusted_average_cores),
+             str(adjusted_core_hours),
+             str(average_hypervisors),
+             str(average_cores),
 	     str(usage['server_usage_count']),
 	     str(usage['total_memory_mb_usage']),
 	     str(usage['total_vcpus_usage']),
-             str(physical_core_hours),
-             str(average_cores),
-             str(average_hypervisors),
+             usage['project_id'],
 	]
 	print ",".join(usage_list)
 
