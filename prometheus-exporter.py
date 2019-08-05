@@ -26,7 +26,9 @@ def get_usage_for_project(cloud, project, time_period):
 
 
 def get_usages(cloud, months):
-    for project in cloud.identity.projects():
+    projects = list(cloud.identity.projects())
+    projects.sort(key = lambda project: project.name)
+    for project in projects:
         if project.domain_id != "default":
             continue
         usages = {}
@@ -96,14 +98,30 @@ if __name__ == '__main__':
     weekly_usages = get_usages(cloud, list(get_weeks()))
     all_usages = list(monthly_usages) + list(weekly_usages)
 
-    print "project_id, project_name, timeframe, server_usage_count, total_memory_mb_usage, total_vcpus_usage"
+    print "project_id, project_name, timeframe, server_usage_count, total_memory_mb_usage, total_vcpus_usage, physical core hours, average physical cores, average physical servers"
 
     for month, usage in all_usages:
+        days = 7
+        if (month == "april" or month == "june"):
+            days = 30
+        if not month.startswith("wb"):
+            days = 31
+
+        hypervisor_hours = float(usage['total_vcpus_usage']) / 56.0  # 56 vCPU per hypervisor
+        physical_core_hours = hypervisor_hours * 32  # 32 physical_cores in a hypervisor
+        hours = 24 * days
+        average_cores = physical_core_hours / hours
+        average_hypervisors = hypervisor_hours / hours
+
 	usage_list = [usage['project_id'], usage['project_name'],
 	     month,
 	     str(usage['server_usage_count']),
 	     str(usage['total_memory_mb_usage']),
-	     str(usage['total_vcpus_usage'])]
+	     str(usage['total_vcpus_usage']),
+             str(physical_core_hours),
+             str(average_cores),
+             str(average_hypervisors),
+	]
 	print ",".join(usage_list)
 
     #REGISTRY.register(CustomCollector(cloud))
