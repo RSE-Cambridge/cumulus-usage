@@ -12,6 +12,9 @@ from prometheus_client import start_http_server
 def get_usage_for_project(cloud, project, time_period):
     url = "/os-simple-tenant-usage/%s?%s"
     response = cloud.compute.get(url % (project.id, time_period))
+    if not response:
+        print response
+        raise Exception("failed to get usage for %s %s" % (project.name, time_period))
     raw_usage = response.json()['tenant_usage']
 
     usage = {'project_id': project.id, 'project_name': project.name}
@@ -58,11 +61,7 @@ class CustomCollector(object):
 def get_month(month):
     return "start=2019-%02d-01T00:00:00&end=2019-%02d-01T00:00:00" % (month, month + 1)
 
-if __name__ == '__main__':
-    cloud = openstack.connect()
-    cloud.compute.servers()
-
-    
+def get_months():
     months = [
       ("april", get_month(4)),
       ("may", get_month(5)),
@@ -70,10 +69,34 @@ if __name__ == '__main__':
       ("july", get_month(7)),
       ("august", get_month(8)),
     ]
-    all_usages = get_usages(cloud, months)
+    return months
 
-    month_text = ", ".join([month[0] for month in months])
-    print "project_id, project_name, month, server_usage_count, total_memory_mb_usage, total_vcpus_usage"
+def get_weeks():
+    import datetime
+    from dateutil import rrule
+    start =  datetime.date(2019, 4, 1)
+    end = datetime.datetime.now().date() + datetime.timedelta(days=7)
+    weeks = rrule.rrule(rrule.WEEKLY, dtstart=start, until=end)
+    previous = None
+    for week in weeks:
+        if not previous:
+            previous = week
+            continue
+        yield "wb:%s" % previous.strftime("%Y-%m-%d"), "start=%s&end=%s" % (
+            previous.strftime("%Y-%m-%dT%H:%M:%S"),
+            week.strftime("%Y-%m-%dT%H:%M:%S"))
+        previous = week
+
+
+if __name__ == '__main__':
+    cloud = openstack.connect()
+    cloud.compute.servers()
+
+    monthly_usages = get_usages(cloud, get_months())
+    weekly_usages = get_usages(cloud, list(get_weeks()))
+    all_usages = list(monthly_usages) + list(weekly_usages)
+
+    print "project_id, project_name, timeframe, server_usage_count, total_memory_mb_usage, total_vcpus_usage"
 
     for month, usage in all_usages:
 	usage_list = [usage['project_id'], usage['project_name'],
